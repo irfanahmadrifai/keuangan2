@@ -7,11 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    /* MATIKAN PULL TO REFRESH SECARA PAKSA */
-    html, body { 
-      overscroll-behavior: none; 
-      -webkit-tap-highlight-color: transparent; 
-    }
+    body { -webkit-tap-highlight-color: transparent; }
     ::-webkit-scrollbar { width: 0px; background: transparent; }
     .nav-active { color: #2563eb; } 
     .nav-inactive { color: #9ca3af; } 
@@ -55,9 +51,7 @@
 
   <div class="fixed top-0 w-full bg-white shadow-sm z-30 px-4 py-3 flex justify-between items-center">
     <div class="font-bold text-lg text-blue-600"><i class="fas fa-leaf mr-2"></i>Keuangan</div>
-    <button onclick="app.forceSync()" id="syncStatus" class="flex items-center gap-2 text-xs font-bold px-3 py-1.5 rounded-full shadow-sm transition-all active:scale-95 bg-gray-200 text-gray-600">
-      <i class="fas fa-wifi-slash"></i> Offline
-    </button>
+    <div id="syncStatus" class="text-xs font-semibold px-2 py-1 rounded bg-gray-200 text-gray-600"><i class="fas fa-wifi mr-1"></i>Offline</div>
   </div>
 
   <div class="flex-1 mt-14 overflow-y-auto px-4 py-4" id="mainContainer">
@@ -215,7 +209,6 @@
         { id: "R3", nama: "Leni (BSI : 6445914660)", saldoAwal: 0 }
       ],
       
-      // Menggunakan Queue (Antrean) untuk Sync yang Akurat
       data: { transactions: [], accounts: [], budgets: [], syncQueue: { addTrx: [], delTrx: [], updAcc: [], updBud: [] } },
       config: { pin: "123456", gasUrl: "" },
       currentDate: new Date(),
@@ -223,24 +216,12 @@
       activeTrxType: "Pengeluaran",
       enteredPin: "",
 
-      checkSession() {
-        // Cek jika sesi login belum kadaluarsa (24 jam)
-        const expiry = localStorage.getItem('sessionExpiry');
-        if (expiry && Date.now() < parseInt(expiry)) {
-          document.getElementById('pinScreen').classList.add('hidden');
-          this.init();
-          return true; // Sesi valid, skip PIN
-        }
-        return false;
-      },
-
       init() {
         const localData = localStorage.getItem('financeData');
         const localConfig = localStorage.getItem('financeConfig');
         
         if (localData) {
           this.data = JSON.parse(localData);
-          // Safety untuk pengguna update dari versi lama
           if (!this.data.syncQueue) this.data.syncQueue = { addTrx: [], delTrx: [], updAcc: [], updBud: [] };
         } else {
           this.data.accounts = JSON.parse(JSON.stringify(this.DEFAULT_ACCOUNTS));
@@ -255,9 +236,6 @@
         this.updateConnectionStatus();
         this.populateDropdowns();
         this.renderAll();
-
-        // Auto Sync di background setiap buka aplikasi (membantu sinkron antar HP)
-        if (this.config.gasUrl) setTimeout(() => this.forceSync(), 1000);
       },
 
       getCycleMonth(dStr) {
@@ -296,11 +274,10 @@
         const lConf = localStorage.getItem('financeConfig');
         if (lConf) this.config = Object.assign(this.config, JSON.parse(lConf));
         if (this.enteredPin === this.config.pin) {
-          // Set Sesi Login 24 Jam
-          localStorage.setItem('sessionExpiry', Date.now() + (1000 * 60 * 60 * 24));
           document.getElementById('pinScreen').classList.add('hidden'); 
           this.init(); 
           this.enteredPin = "";
+          if (this.config.gasUrl) setTimeout(() => this.forceSync(), 500);
         } else {
           document.getElementById('pinError').classList.remove('hidden'); this.enteredPin = ""; this.updatePinDisplay();
         }
@@ -416,7 +393,7 @@
       
       deleteTransaction(id) {
         if(confirm('Yakin ingin menghapus transaksi ini?')) {
-          this.data.syncQueue.delTrx.push(id); // Masuk Antrean Hapus
+          this.data.syncQueue.delTrx.push(id);
           this.data.transactions = this.data.transactions.filter(t => t.id !== id);
           this.saveState(); this.closeTrxDetail(); this.renderAll(); 
         }
@@ -463,7 +440,7 @@
         const trx = { id: this.generateId(), waktu: new Date().toISOString(), tanggal: date, jenis: this.activeTrxType, nominal: nom, rekeningAsal: sAcc, rekeningTujuan: this.activeTrxType === 'Mutasi' ? dAcc : "", kategori: this.activeTrxType === 'Mutasi' ? "" : document.getElementById('formCategory').value, keterangan: document.getElementById('formNote').value };
         
         this.data.transactions.push(trx); 
-        this.data.syncQueue.addTrx.push(trx); // Masuk Antrean Tambah
+        this.data.syncQueue.addTrx.push(trx); 
         this.saveState();
         
         document.getElementById('formAmount').value = ''; document.getElementById('formNote').value = ''; alert('Transaksi Berhasil Disimpan!'); this.nav('home');
@@ -473,7 +450,7 @@
         let acc = this.data.accounts.find(a => a.id === id);
         if (acc) { 
           acc.saldoAwal = nom; 
-          this.data.syncQueue.updAcc.push(acc); // Masuk Antrean Rekening
+          this.data.syncQueue.updAcc.push(acc); 
           this.saveState(); 
           this.renderAccounts(); 
           document.getElementById('editAccBalance').value = ''; 
@@ -496,7 +473,7 @@
           let cat = inp.getAttribute('data-cat'); let nom = parseFloat(inp.value) || 0; let idx = this.data.budgets.findIndex(b => b.bulan === period && b.kategori === cat);
           let budObj = { bulan: period, kategori: cat, nominal: nom };
           if (idx > -1) { this.data.budgets[idx].nominal = nom; } else { if (nom > 0) this.data.budgets.push(budObj); }
-          this.data.syncQueue.updBud.push(budObj); // Masuk Antrean Anggaran
+          this.data.syncQueue.updBud.push(budObj); 
         });
         this.saveState(); this.closeBudgetModal(); this.renderBudget(); this.renderHome();
       },
@@ -507,31 +484,37 @@
         this.autoSync();
       },
       
-      // LOGIKA SINKRONISASI BARU 
       updateConnectionStatus(isSyncing = false) {
         const statusEl = document.getElementById('syncStatus'); 
-        this.config.gasUrl = document.getElementById('settingGasUrl').value.trim(); 
-        localStorage.setItem('financeConfig', JSON.stringify(this.config));
         
         if (!this.config.gasUrl) { 
-          statusEl.innerHTML = '<i class="fas fa-wifi-slash"></i> Offline'; 
-          statusEl.className = "flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-full shadow-sm bg-gray-200 text-gray-600"; 
+          statusEl.innerHTML = '<i class="fas fa-wifi-slash mr-1"></i>Offline'; 
+          statusEl.className = "text-xs font-semibold px-2 py-1 rounded bg-gray-200 text-gray-600"; 
         }
         else if (isSyncing) { 
-          statusEl.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> Sync...'; 
-          statusEl.className = "flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-full shadow-sm bg-blue-100 text-blue-600"; 
+          statusEl.innerHTML = '<i class="fas fa-sync-alt fa-spin mr-1"></i>Syncing..'; 
+          statusEl.className = "text-xs font-semibold px-2 py-1 rounded bg-blue-100 text-blue-600"; 
         }
         else { 
-          statusEl.innerHTML = '<i class="fas fa-sync-alt"></i> Sync'; 
-          statusEl.className = "flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-full shadow-sm bg-green-100 text-green-700 active:bg-green-200 transition-colors cursor-pointer"; 
+          statusEl.innerHTML = '<i class="fas fa-cloud-check mr-1"></i>Online'; 
+          statusEl.className = "text-xs font-semibold px-2 py-1 rounded bg-green-100 text-green-600"; 
         }
       },
       autoSync() { if (this.config.gasUrl) this.forceSync(); },
       async forceSync() {
-        if (!this.config.gasUrl) return alert('URL GAS kosong. Tetap dalam mode Offline.'); 
-        this.updateConnectionStatus(true); 
+        // Ambil URL langsung dari textarea sebelum mengecek
+        const inputUrl = document.getElementById('settingGasUrl').value.trim();
+        if (inputUrl !== "") {
+          this.config.gasUrl = inputUrl;
+          localStorage.setItem('financeConfig', JSON.stringify(this.config));
+        }
+
+        if (!this.config.gasUrl) { 
+          alert('URL GAS kosong. Tetap dalam mode Offline.'); 
+          return this.updateConnectionStatus(); 
+        }
         
-        // Kirim hanya antrean data yang baru dirubah di HP ini
+        this.updateConnectionStatus(true); 
         const payload = { action: "sync", payload: this.data.syncQueue };
         
         try {
@@ -540,14 +523,10 @@
           const json = await res.json();
           
           if (json.status === 'success') {
-            // REPLACE TOTAL: Timpa data lokal dengan data Google Sheets (Master)
             this.data.transactions = json.data.transactions;
             this.data.accounts = json.data.accounts;
             this.data.budgets = json.data.budgets;
-            
-            // Bersihkan antrean karena sudah sukses terkirim
             this.data.syncQueue = { addTrx: [], delTrx: [], updAcc: [], updBud: [] }; 
-            
             localStorage.setItem('financeData', JSON.stringify(this.data));
             this.renderAll();
           }
@@ -560,12 +539,7 @@
       }
     };
 
-    window.onload = () => {
-      // Cek apakah baru saja login (kurang dari 24 jam)
-      if (!app.checkSession()) {
-        // Jika belum, biarkan di halaman PIN
-      }
-    };
+    window.onload = () => {};
   </script>
 </body>
 </html>

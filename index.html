@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Keuangan Keluarga</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    /* MATIKAN PULL TO REFRESH SECARA PAKSA */
+    html, body { 
+      overscroll-behavior: none; 
+      -webkit-tap-highlight-color: transparent; 
+    }
+    ::-webkit-scrollbar { width: 0px; background: transparent; }
+    .nav-active { color: #2563eb; } 
+    .nav-inactive { color: #9ca3af; } 
+    .view-section { display: none; padding-bottom: 80px; }
+    .view-section.active { display: block; animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans h-screen flex flex-col">
+
+  <div id="pinScreen" class="fixed inset-0 bg-blue-600 z-50 flex flex-col items-center justify-center text-white transition-opacity duration-300">
+    <i class="fas fa-wallet text-5xl mb-4"></i>
+    <h1 class="text-2xl font-bold mb-2">Aplikasi Keuangan</h1>
+    <p class="mb-6 text-blue-200">Masukkan PIN 6 Digit</p>
+    
+    <div class="flex gap-4 mb-8" id="pinIndicator">
+      <div class="w-4 h-4 rounded-full bg-blue-400 transition-colors duration-200"></div>
+      <div class="w-4 h-4 rounded-full bg-blue-400 transition-colors duration-200"></div>
+      <div class="w-4 h-4 rounded-full bg-blue-400 transition-colors duration-200"></div>
+      <div class="w-4 h-4 rounded-full bg-blue-400 transition-colors duration-200"></div>
+      <div class="w-4 h-4 rounded-full bg-blue-400 transition-colors duration-200"></div>
+      <div class="w-4 h-4 rounded-full bg-blue-400 transition-colors duration-200"></div>
+    </div>
+
+    <div class="grid grid-cols-3 gap-6 max-w-xs mx-auto">
+      <button onclick="app.pressPin('1')" class="w-16 h-16 rounded-full bg-white bg-opacity-10 text-2xl font-bold focus:outline-none active:bg-opacity-30 active:scale-95 transition-all">1</button>
+      <button onclick="app.pressPin('2')" class="w-16 h-16 rounded-full bg-white bg-opacity-10 text-2xl font-bold focus:outline-none active:bg-opacity-30 active:scale-95 transition-all">2</button>
+      <button onclick="app.pressPin('3')" class="w-16 h-16 rounded-full bg-white bg-opacity-10 text-2xl font-bold focus:outline-none active:bg-opacity-30 active:scale-95 transition-all">3</button>
+      <button onclick="app.pressPin('4')" class="w-16 h-16 rounded-full bg-white bg-opacity-10 text-2xl font-bold focus:outline-none active:bg-opacity-30 active:scale-95 transition-all">4</button>
+      <button onclick="app.pressPin('5')" class="w-16 h-16 rounded-full bg-white bg-opacity-10 text-2xl font-bold focus:outline-none active:bg-opacity-30 active:scale-95 transition-all">5</button>
+      <button onclick="app.pressPin('6')" class="w-16 h-16 rounded-full bg-white bg-opacity-10 text-2xl font-bold focus:outline-none active:bg-opacity-30 active:scale-95 transition-all">6</button>
+      <button onclick="app.pressPin('7')" class="w-16 h-16 rounded-full bg-white bg-opacity-10 text-2xl font-bold focus:outline-none active:bg-opacity-30 active:scale-95 transition-all">7</button>
+      <button onclick="app.pressPin('8')" class="w-16 h-16 rounded-full bg-white bg-opacity-10 text-2xl font-bold focus:outline-none active:bg-opacity-30 active:scale-95 transition-all">8</button>
+      <button onclick="app.pressPin('9')" class="w-16 h-16 rounded-full bg-white bg-opacity-10 text-2xl font-bold focus:outline-none active:bg-opacity-30 active:scale-95 transition-all">9</button>
+      <button onclick="app.clearPin()" class="w-16 h-16 rounded-full bg-red-500 bg-opacity-20 text-xl font-bold focus:outline-none active:bg-opacity-50 active:scale-95 transition-all text-red-200">C</button>
+      <button onclick="app.pressPin('0')" class="w-16 h-16 rounded-full bg-white bg-opacity-10 text-2xl font-bold focus:outline-none active:bg-opacity-30 active:scale-95 transition-all">0</button>
+      <button onclick="app.deletePin()" class="w-16 h-16 rounded-full bg-white bg-opacity-10 text-xl font-bold focus:outline-none active:bg-opacity-30 active:scale-95 transition-all"><i class="fas fa-backspace"></i></button>
+    </div>
+    <p id="pinError" class="text-red-300 mt-6 font-semibold hidden tracking-wide">PIN Salah! Coba lagi.</p>
+  </div>
+
+  <div class="fixed top-0 w-full bg-white shadow-sm z-30 px-4 py-3 flex justify-between items-center">
+    <div class="font-bold text-lg text-blue-600"><i class="fas fa-leaf mr-2"></i>Keuangan</div>
+    <button onclick="app.forceSync()" id="syncStatus" class="flex items-center gap-2 text-xs font-bold px-3 py-1.5 rounded-full shadow-sm transition-all active:scale-95 bg-gray-200 text-gray-600">
+      <i class="fas fa-wifi-slash"></i> Offline
+    </button>
+  </div>
+
+  <div class="flex-1 mt-14 overflow-y-auto px-4 py-4" id="mainContainer">
+
+    <div id="view-home" class="view-section active">
+      <div class="bg-gradient-to-r from-blue-600 to-blue-500 rounded-2xl p-5 text-white shadow-lg mb-6">
+        <p class="text-sm opacity-80 mb-1">Total Saldo Gabungan</p>
+        <h2 class="text-3xl font-bold" id="totalSaldoDisplay">Rp 0</h2>
+        <p class="text-xs mt-2 opacity-80"><i class="fas fa-info-circle"></i> Termasuk aset investasi</p>
+      </div>
+
+      <div class="flex justify-between items-center mb-4 bg-white p-2 rounded-lg shadow-sm">
+        <button onclick="app.changeMonth(-1)" class="p-2 text-gray-500 active:scale-90"><i class="fas fa-chevron-left"></i></button>
+        <div class="font-bold text-gray-700" id="currentPeriodDisplay">April 2026</div>
+        <button onclick="app.changeMonth(1)" class="p-2 text-gray-500 active:scale-90"><i class="fas fa-chevron-right"></i></button>
+      </div>
+
+      <div class="grid grid-cols-2 gap-4 mb-6">
+        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-green-500">
+          <p class="text-xs text-gray-500">Pemasukan</p>
+          <p class="text-sm font-bold text-green-600" id="totalInDisplay">Rp 0</p>
+        </div>
+        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-red-500">
+          <p class="text-xs text-gray-500">Pengeluaran</p>
+          <p class="text-sm font-bold text-red-600" id="totalOutDisplay">Rp 0</p>
+        </div>
+      </div>
+
+      <div class="mb-6">
+        <div class="flex justify-between items-end mb-3"><h3 class="font-bold text-gray-700">Ringkasan Anggaran</h3></div>
+        <div class="bg-white rounded-xl shadow-sm p-4" id="budgetSummaryList"></div>
+      </div>
+
+      <div>
+        <h3 class="font-bold text-gray-700 mb-3">Transaksi (Klik untuk detail)</h3>
+        <div class="bg-white rounded-xl shadow-sm overflow-hidden" id="transactionList"></div>
+      </div>
+    </div>
+
+    <div id="view-accounts" class="view-section">
+      <h2 class="text-xl font-bold text-gray-800 mb-4">Daftar Rekening</h2>
+      <div id="accountList" class="space-y-3"></div>
+      
+      <div class="mt-6 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+        <h3 class="font-bold text-gray-700 mb-2">Edit Saldo Awal</h3>
+        <p class="text-xs text-gray-500 mb-3">Ubah saldo awal rekening (Hanya lakukan jika terjadi selisih).</p>
+        <select id="editAccSelect" class="w-full p-2 border rounded-lg mb-2 text-sm outline-none bg-gray-50"></select>
+        <input type="number" id="editAccBalance" placeholder="Nominal Saldo Awal" class="w-full p-2 border rounded-lg mb-3 text-sm outline-none bg-gray-50">
+        <button onclick="app.updateInitialBalance()" class="w-full bg-blue-600 text-white font-bold py-2 rounded-lg shadow active:scale-95 transition-all">Update Saldo</button>
+      </div>
+    </div>
+
+    <div id="view-add" class="view-section">
+      <h2 class="text-xl font-bold text-gray-800 mb-4">Catat Transaksi</h2>
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+        <div class="flex mb-4 p-1 bg-gray-100 rounded-lg">
+          <button onclick="app.setTrxType('Pengeluaran')" id="btnTypeOut" class="flex-1 py-1 text-sm font-bold rounded-md bg-white shadow text-red-600">Keluar</button>
+          <button onclick="app.setTrxType('Pemasukan')" id="btnTypeIn" class="flex-1 py-1 text-sm font-bold rounded-md text-gray-500">Masuk</button>
+          <button onclick="app.setTrxType('Mutasi')" id="btnTypeMut" class="flex-1 py-1 text-sm font-bold rounded-md text-gray-500">Mutasi</button>
+        </div>
+        <div class="space-y-4">
+          <div><label class="block text-xs text-gray-500 mb-1">Tanggal</label><input type="date" id="formDate" class="w-full p-2 border rounded-lg text-sm outline-none bg-gray-50"></div>
+          <div><label class="block text-xs text-gray-500 mb-1">Nominal (Rp)</label><input type="number" id="formAmount" placeholder="0" class="w-full p-2 border rounded-lg text-xl font-bold outline-none bg-gray-50 text-blue-600"></div>
+          <div><label class="block text-xs text-gray-500 mb-1">Kategori</label><select id="formCategory" class="w-full p-2 border rounded-lg text-sm outline-none bg-gray-50"></select></div>
+          <div id="wrapSourceAcc"><label class="block text-xs text-gray-500 mb-1" id="lblSourceAcc">Rekening (Sumber)</label><select id="formSourceAcc" class="w-full p-2 border rounded-lg text-sm outline-none bg-gray-50"></select></div>
+          <div id="wrapDestAcc" class="hidden"><label class="block text-xs text-gray-500 mb-1">Rekening Tujuan</label><select id="formDestAcc" class="w-full p-2 border rounded-lg text-sm outline-none bg-gray-50"></select></div>
+          <div><label class="block text-xs text-gray-500 mb-1">Keterangan</label><input type="text" id="formNote" placeholder="Catatan opsional" class="w-full p-2 border rounded-lg text-sm outline-none bg-gray-50"></div>
+          <button onclick="app.saveTransaction()" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg shadow-md hover:bg-blue-700 mt-2 active:scale-95 transition-all">Simpan Transaksi</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="view-budget" class="view-section">
+      <h2 class="text-xl font-bold text-gray-800 mb-4">Rencana Anggaran</h2>
+      <div class="flex justify-between items-center mb-4 bg-white p-2 rounded-lg shadow-sm">
+        <button onclick="app.changeMonth(-1)" class="p-2 text-gray-500 active:scale-90"><i class="fas fa-chevron-left"></i></button>
+        <div class="font-bold text-gray-700" id="budgetPeriodDisplay">April 2026</div>
+        <button onclick="app.changeMonth(1)" class="p-2 text-gray-500 active:scale-90"><i class="fas fa-chevron-right"></i></button>
+      </div>
+      <div class="bg-blue-50 border border-blue-100 p-4 rounded-xl mb-4 text-center">
+        <p class="text-xs text-blue-600 font-bold mb-1">Total Alokasi Periode Ini</p>
+        <h3 class="text-2xl font-bold text-blue-800" id="totalAllocationDisplay">Rp 0</h3>
+      </div>
+      <div class="bg-white rounded-xl shadow-sm p-4">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="font-bold text-gray-700">Atur Anggaran</h3>
+          <button onclick="app.openBudgetModal()" class="text-sm bg-blue-100 text-blue-600 px-3 py-1 rounded-full active:bg-blue-200"><i class="fas fa-edit mr-1"></i> Edit</button>
+        </div>
+        <div id="budgetSetupList" class="space-y-3"></div>
+      </div>
+    </div>
+
+    <div id="view-settings" class="view-section">
+      <h2 class="text-xl font-bold text-gray-800 mb-4">Pengaturan</h2>
+      
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-4">
+        <label class="block text-sm font-bold text-gray-700 mb-2">URL Google Apps Script</label>
+        <textarea id="settingGasUrl" rows="3" class="w-full p-2 border rounded-lg text-xs outline-none bg-gray-50" placeholder="https://script.google.com/macros/s/.../exec"></textarea>
+        <p class="text-[10px] text-gray-500 mt-2 mb-3">Agar HP istri mendapat update, klik "Sinkronisasi" di bawah setelah mengisi link ini.</p>
+        <button onclick="app.forceSync()" id="btnSync" class="w-full bg-green-500 text-white font-bold py-2 rounded-lg shadow-md active:scale-95 transition-all"><i class="fas fa-sync-alt mr-2"></i>Sinkronisasi Sekarang</button>
+      </div>
+
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+        <label class="block text-sm font-bold text-gray-700 mb-2">Ubah PIN Keamanan</label>
+        <input type="password" id="settingNewPin" maxlength="6" placeholder="PIN Baru (6 Digit)" class="w-full p-2 border rounded-lg text-sm mb-3 outline-none bg-gray-50" inputmode="numeric">
+        <button onclick="app.savePin()" class="w-full bg-gray-800 text-white font-bold py-2 rounded-lg shadow-md active:scale-95 transition-all">Simpan PIN</button>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="budgetModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex-col justify-end">
+    <div class="bg-white rounded-t-2xl p-4 h-3/4 overflow-y-auto w-full shadow-2xl">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="font-bold text-lg">Edit Anggaran <span id="modalMonthSpan" class="text-blue-600"></span></h3>
+        <button onclick="app.closeBudgetModal()" class="text-gray-500 text-2xl active:scale-90">&times;</button>
+      </div>
+      <div id="budgetModalForm" class="space-y-4 mb-20"></div>
+      <div class="fixed bottom-0 left-0 w-full p-4 bg-white border-t">
+        <button onclick="app.saveBudgets()" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg shadow-md active:scale-95 transition-all">Simpan Anggaran</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="trxDetailModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex-col justify-center items-center px-4">
+    <div class="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl">
+      <div class="bg-blue-600 p-4 text-white flex justify-between items-center">
+        <h3 class="font-bold">Detail Transaksi</h3>
+        <button onclick="app.closeTrxDetail()" class="text-white text-2xl leading-none active:scale-90">&times;</button>
+      </div>
+      <div class="p-6 bg-white" id="trxDetailContent"></div>
+      <div class="p-4 bg-gray-50 border-t flex gap-3">
+        <button onclick="app.closeTrxDetail()" class="flex-1 bg-gray-200 text-gray-800 font-bold py-2 rounded-lg active:scale-95 transition-all">Tutup</button>
+        <button id="btnDeleteTrx" class="flex-1 bg-red-500 text-white font-bold py-2 rounded-lg shadow active:scale-95 transition-all"><i class="fas fa-trash mr-1"></i> Hapus</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="fixed bottom-0 w-full bg-white border-t border-gray-200 flex justify-around items-center pb-safe pt-2 z-40" style="padding-bottom: env(safe-area-inset-bottom, 12px);">
+    <button onclick="app.nav('home')" id="nav-home" class="flex flex-col items-center w-16 nav-active"><i class="fas fa-home text-xl mb-1"></i><span class="text-[10px] font-semibold">Beranda</span></button>
+    <button onclick="app.nav('accounts')" id="nav-accounts" class="flex flex-col items-center w-16 nav-inactive"><i class="fas fa-wallet text-xl mb-1"></i><span class="text-[10px] font-semibold">Rekening</span></button>
+    <button onclick="app.nav('add')" id="nav-add" class="relative -top-5 flex flex-col items-center justify-center w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg border-4 border-gray-50 active:scale-90 transition-all"><i class="fas fa-plus text-xl"></i></button>
+    <button onclick="app.nav('budget')" id="nav-budget" class="flex flex-col items-center w-16 nav-inactive"><i class="fas fa-chart-pie text-xl mb-1"></i><span class="text-[10px] font-semibold">Anggaran</span></button>
+    <button onclick="app.nav('settings')" id="nav-settings" class="flex flex-col items-center w-16 nav-inactive"><i class="fas fa-cog text-xl mb-1"></i><span class="text-[10px] font-semibold">Setting</span></button>
+  </div>
+
+  <script>
+    const app = {
+      MONTH_NAMES: ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"],
+      CAT_IN: ["Gaji", "Insentif", "Bonus / Lainnya"],
+      CAT_OUT: ["Keluarga", "Kebutuhan Rumah", "Sekolah", "Kendaraan", "Komunikasi", "Investasi", "Kesehatan", "Kebutuhan Bayi", "Darurat / Lainnya"],
+      DEFAULT_ACCOUNTS: [
+        { id: "R1", nama: "Irfan Gaji (BSI : 7220471815)", saldoAwal: 0 },
+        { id: "R2", nama: "Irfan Tabungan (BSI : 7220471815)", saldoAwal: 0 },
+        { id: "R3", nama: "Leni (BSI : 6445914660)", saldoAwal: 0 }
+      ],
+      
+      // Menggunakan Queue (Antrean) untuk Sync yang Akurat
+      data: { transactions: [], accounts: [], budgets: [], syncQueue: { addTrx: [], delTrx: [], updAcc: [], updBud: [] } },
+      config: { pin: "123456", gasUrl: "" },
+      currentDate: new Date(),
+      currentCyclePeriod: "", 
+      activeTrxType: "Pengeluaran",
+      enteredPin: "",
+
+      checkSession() {
+        // Cek jika sesi login belum kadaluarsa (24 jam)
+        const expiry = localStorage.getItem('sessionExpiry');
+        if (expiry && Date.now() < parseInt(expiry)) {
+          document.getElementById('pinScreen').classList.add('hidden');
+          this.init();
+          return true; // Sesi valid, skip PIN
+        }
+        return false;
+      },
+
+      init() {
+        const localData = localStorage.getItem('financeData');
+        const localConfig = localStorage.getItem('financeConfig');
+        
+        if (localData) {
+          this.data = JSON.parse(localData);
+          // Safety untuk pengguna update dari versi lama
+          if (!this.data.syncQueue) this.data.syncQueue = { addTrx: [], delTrx: [], updAcc: [], updBud: [] };
+        } else {
+          this.data.accounts = JSON.parse(JSON.stringify(this.DEFAULT_ACCOUNTS));
+        }
+        
+        if (localConfig) this.config = Object.assign(this.config, JSON.parse(localConfig));
+        
+        document.getElementById('formDate').value = this.currentDate.toISOString().split('T')[0];
+        this.currentCyclePeriod = this.getCycleMonth(this.currentDate);
+        document.getElementById('settingGasUrl').value = this.config.gasUrl;
+        
+        this.updateConnectionStatus();
+        this.populateDropdowns();
+        this.renderAll();
+
+        // Auto Sync di background setiap buka aplikasi (membantu sinkron antar HP)
+        if (this.config.gasUrl) setTimeout(() => this.forceSync(), 1000);
+      },
+
+      getCycleMonth(dStr) {
+        let d = new Date(dStr); let date = d.getDate(); let month = d.getMonth() + 1; let year = d.getFullYear();
+        if (date >= 27) { month += 1; if (month > 12) { month = 1; year += 1; } }
+        return `${year}-${month.toString().padStart(2, '0')}`;
+      },
+      formatPeriodDisplay(p) { const [y, m] = p.split('-'); return `${this.MONTH_NAMES[parseInt(m)-1]} ${y}`; },
+      changeMonth(dir) {
+        let [y, m] = this.currentCyclePeriod.split('-').map(Number);
+        m += dir; if (m > 12) { m = 1; y += 1; } if (m < 1) { m = 12; y -= 1; }
+        this.currentCyclePeriod = `${y}-${m.toString().padStart(2, '0')}`;
+        this.renderHome(); this.renderBudget();
+      },
+      formatRp(num) { return "Rp " + num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, "."); },
+      generateId() { return 'ID-' + new Date().getTime() + '-' + Math.floor(Math.random() * 1000); },
+
+      pressPin(num) {
+        document.getElementById('pinError').classList.add('hidden');
+        if (this.enteredPin.length < 6) { this.enteredPin += num; this.updatePinDisplay(); }
+        if (this.enteredPin.length === 6) setTimeout(() => this.verifyPin(), 100); 
+      },
+      deletePin() {
+        document.getElementById('pinError').classList.add('hidden');
+        if (this.enteredPin.length > 0) { this.enteredPin = this.enteredPin.slice(0, -1); this.updatePinDisplay(); }
+      },
+      clearPin() { document.getElementById('pinError').classList.add('hidden'); this.enteredPin = ""; this.updatePinDisplay(); },
+      updatePinDisplay() {
+        const ind = document.getElementById('pinIndicator').children;
+        for (let i = 0; i < 6; i++) {
+          if (i < this.enteredPin.length) { ind[i].classList.remove('bg-blue-400'); ind[i].classList.add('bg-white'); }
+          else { ind[i].classList.remove('bg-white'); ind[i].classList.add('bg-blue-400'); }
+        }
+      },
+      verifyPin() {
+        const lConf = localStorage.getItem('financeConfig');
+        if (lConf) this.config = Object.assign(this.config, JSON.parse(lConf));
+        if (this.enteredPin === this.config.pin) {
+          // Set Sesi Login 24 Jam
+          localStorage.setItem('sessionExpiry', Date.now() + (1000 * 60 * 60 * 24));
+          document.getElementById('pinScreen').classList.add('hidden'); 
+          this.init(); 
+          this.enteredPin = "";
+        } else {
+          document.getElementById('pinError').classList.remove('hidden'); this.enteredPin = ""; this.updatePinDisplay();
+        }
+      },
+      savePin() {
+        const newPin = document.getElementById('settingNewPin').value;
+        if (newPin.length === 6) { this.config.pin = newPin; this.saveState(); alert('PIN berhasil diubah!'); document.getElementById('settingNewPin').value = ''; }
+        else alert('PIN harus 6 digit angka');
+      },
+      nav(viewId) {
+        document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+        document.getElementById('view-' + viewId).classList.add('active');
+        ['home', 'accounts', 'budget', 'settings'].forEach(n => {
+          const el = document.getElementById('nav-' + n);
+          if (el) { el.classList.remove('nav-active'); el.classList.add('nav-inactive'); }
+        });
+        if (['home', 'accounts', 'budget', 'settings'].includes(viewId)) {
+          document.getElementById('nav-' + viewId).classList.remove('nav-inactive'); document.getElementById('nav-' + viewId).classList.add('nav-active');
+        }
+        if (viewId === 'home') this.renderHome();
+        if (viewId === 'accounts') this.renderAccounts();
+        if (viewId === 'budget') this.renderBudget();
+        if (viewId === 'add') this.populateDropdowns();
+      },
+
+      getCalculatedBalances() {
+        let balances = {}; this.data.accounts.forEach(a => balances[a.id] = parseFloat(a.saldoAwal) || 0);
+        let totalInvestasi = 0;
+        this.data.transactions.forEach(trx => {
+          const nom = parseFloat(trx.nominal);
+          if (trx.jenis === 'Pemasukan') balances[trx.rekeningAsal] += nom;
+          else if (trx.jenis === 'Pengeluaran') { balances[trx.rekeningAsal] -= nom; if (trx.kategori === 'Investasi') totalInvestasi += nom; }
+          else if (trx.jenis === 'Mutasi') { balances[trx.rekeningAsal] -= nom; if (balances[trx.rekeningTujuan] !== undefined) balances[trx.rekeningTujuan] += nom; }
+        });
+        let totalGabungan = 0; for (let key in balances) totalGabungan += balances[key];
+        totalGabungan += totalInvestasi;
+        return { balances, totalGabungan };
+      },
+      getTrxByPeriod(period) { return this.data.transactions.filter(t => this.getCycleMonth(t.tanggal) === period); },
+
+      renderAll() { this.renderHome(); this.renderAccounts(); this.renderBudget(); },
+      renderHome() {
+        const period = this.currentCyclePeriod;
+        document.getElementById('currentPeriodDisplay').innerText = this.formatPeriodDisplay(period);
+        const calc = this.getCalculatedBalances();
+        document.getElementById('totalSaldoDisplay').innerText = this.formatRp(calc.totalGabungan);
+
+        const trx = this.getTrxByPeriod(period);
+        let inTotal = 0, outTotal = 0; let outByCategory = {}; this.CAT_OUT.forEach(c => outByCategory[c] = 0);
+        trx.forEach(t => {
+          if (t.jenis === 'Pemasukan') inTotal += parseFloat(t.nominal);
+          if (t.jenis === 'Pengeluaran') { outTotal += parseFloat(t.nominal); if (outByCategory[t.kategori] !== undefined) outByCategory[t.kategori] += parseFloat(t.nominal); }
+        });
+        document.getElementById('totalInDisplay').innerText = this.formatRp(inTotal);
+        document.getElementById('totalOutDisplay').innerText = this.formatRp(outTotal);
+
+        let htmlBudget = '';
+        this.CAT_OUT.forEach(cat => {
+          let spent = outByCategory[cat]; let budObj = this.data.budgets.find(b => b.bulan === period && b.kategori === cat); let limit = budObj ? parseFloat(budObj.nominal) : 0;
+          if (limit > 0 || spent > 0) {
+            let pct = limit > 0 ? (spent / limit) * 100 : 100;
+            let color = 'text-green-500'; let icon = 'fa-check-circle'; let bar = 'bg-green-500';
+            if (pct >= 90 || (spent > 0 && limit === 0)) { color = 'text-red-500'; icon = 'fa-exclamation-circle'; bar = 'bg-red-500'; }
+            else if (pct > 50) { color = 'text-yellow-500'; icon = 'fa-exclamation-triangle'; bar = 'bg-yellow-500'; }
+            htmlBudget += `<div class="mb-3 border-b pb-2 last:border-0"><div class="flex justify-between items-center mb-1"><span class="text-xs font-semibold text-gray-700">${cat}</span><span class="text-xs font-bold ${color}"><i class="fas ${icon} mr-1"></i> ${Math.min(pct, 100).toFixed(0)}%</span></div><div class="w-full bg-gray-200 rounded-full h-1.5 mb-1"><div class="${bar} h-1.5 rounded-full" style="width: ${Math.min(pct, 100)}%"></div></div><div class="flex justify-between text-[10px] text-gray-500"><span>Terpakai: ${this.formatRp(spent)}</span><span>Anggaran: ${this.formatRp(limit)}</span></div></div>`;
+          }
+        });
+        if(!htmlBudget) htmlBudget = '<p class="text-xs text-center text-gray-400 py-2">Belum ada data anggaran/pengeluaran.</p>';
+        document.getElementById('budgetSummaryList').innerHTML = htmlBudget;
+
+        let htmlTrx = '';
+        trx.sort((a,b) => new Date(b.tanggal) - new Date(a.tanggal)).forEach(t => {
+          let isOut = t.jenis === 'Pengeluaran'; let sign = isOut ? '-' : (t.jenis === 'Pemasukan' ? '+' : ''); let color = isOut ? 'text-red-500' : (t.jenis === 'Pemasukan' ? 'text-green-500' : 'text-gray-600');
+          let accName = this.data.accounts.find(a => a.id === t.rekeningAsal)?.nama || 'N/A';
+          if(t.jenis === 'Mutasi') { let destName = this.data.accounts.find(a => a.id === t.rekeningTujuan)?.nama || 'N/A'; accName = `${accName} &rarr; ${destName}`; }
+          
+          htmlTrx += `
+            <div onclick="app.showTrxDetail('${t.id}')" class="flex justify-between items-center p-3 border-b last:border-0 hover:bg-gray-100 active:bg-gray-200 cursor-pointer transition-colors">
+              <div>
+                <p class="font-semibold text-sm text-gray-800">${t.kategori || 'Mutasi'} <span class="text-[10px] font-normal text-gray-500 ml-1">${t.tanggal}</span></p>
+                <p class="text-xs text-gray-500" style="max-width:200px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><span class="font-medium text-gray-600">${accName}</span> ${t.keterangan ? ' | '+t.keterangan : ''}</p>
+              </div>
+              <div class="font-bold text-sm ${color}">${sign}${this.formatRp(t.nominal)}</div>
+            </div>`;
+        });
+        if(!htmlTrx) htmlTrx = '<div class="p-6 text-center text-sm text-gray-400">Tidak ada transaksi bulan ini.</div>';
+        document.getElementById('transactionList').innerHTML = htmlTrx;
+      },
+
+      showTrxDetail(id) {
+        const t = this.data.transactions.find(x => x.id === id);
+        if(!t) return;
+        let isOut = t.jenis === 'Pengeluaran'; let sign = isOut ? '-' : (t.jenis === 'Pemasukan' ? '+' : ''); let color = isOut ? 'text-red-500' : (t.jenis === 'Pemasukan' ? 'text-green-500' : 'text-blue-600');
+        let accName = this.data.accounts.find(a => a.id === t.rekeningAsal)?.nama || 'N/A';
+        if(t.jenis === 'Mutasi') { let destName = this.data.accounts.find(a => a.id === t.rekeningTujuan)?.nama || 'N/A'; accName = `${accName} &rarr; ${destName}`; }
+
+        const html = `
+          <div class="text-center mb-6">
+            <p class="text-sm text-gray-500 font-semibold mb-1">${t.tanggal}</p>
+            <h2 class="text-3xl font-bold ${color} mb-1">${sign}${this.formatRp(t.nominal)}</h2>
+            <p class="text-sm font-bold text-gray-700 bg-gray-100 inline-block px-3 py-1 rounded-full">${t.jenis} - ${t.kategori || 'Antar Rekening'}</p>
+          </div>
+          <div class="space-y-3 text-sm">
+            <div class="flex justify-between border-b pb-2"><span class="text-gray-500">Rekening</span><span class="font-bold text-right text-gray-800">${accName}</span></div>
+            <div class="flex flex-col border-b pb-2"><span class="text-gray-500 mb-1">Keterangan / Catatan</span><span class="font-medium text-gray-800">${t.keterangan || '-'}</span></div>
+          </div>
+        `;
+        document.getElementById('trxDetailContent').innerHTML = html;
+        document.getElementById('btnDeleteTrx').onclick = () => app.deleteTransaction(id);
+        document.getElementById('trxDetailModal').classList.remove('hidden'); document.getElementById('trxDetailModal').classList.add('flex');
+      },
+      closeTrxDetail() { document.getElementById('trxDetailModal').classList.add('hidden'); document.getElementById('trxDetailModal').classList.remove('flex'); },
+      
+      deleteTransaction(id) {
+        if(confirm('Yakin ingin menghapus transaksi ini?')) {
+          this.data.syncQueue.delTrx.push(id); // Masuk Antrean Hapus
+          this.data.transactions = this.data.transactions.filter(t => t.id !== id);
+          this.saveState(); this.closeTrxDetail(); this.renderAll(); 
+        }
+      },
+
+      renderAccounts() {
+        const calc = this.getCalculatedBalances(); let html = ''; let selectHtml = '';
+        this.data.accounts.forEach(a => {
+          html += `<div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center"><div><p class="font-bold text-gray-700 text-sm">${a.nama}</p><p class="text-xs text-gray-500 mt-1">Awal: ${this.formatRp(a.saldoAwal)}</p></div><div class="text-right"><p class="text-[10px] text-gray-400 mb-1">Saldo Berjalan</p><p class="font-bold text-blue-600">${this.formatRp(calc.balances[a.id])}</p></div></div>`;
+          selectHtml += `<option value="${a.id}">${a.nama}</option>`;
+        });
+        document.getElementById('accountList').innerHTML = html; document.getElementById('editAccSelect').innerHTML = selectHtml;
+      },
+      renderBudget() {
+        const period = this.currentCyclePeriod;
+        document.getElementById('budgetPeriodDisplay').innerText = this.formatPeriodDisplay(period);
+        let total = 0; let html = '';
+        this.CAT_OUT.forEach(cat => {
+          let budObj = this.data.budgets.find(b => b.bulan === period && b.kategori === cat); let nom = budObj ? parseFloat(budObj.nominal) : 0; total += nom;
+          html += `<div class="flex justify-between items-center border-b pb-2 last:border-0"><span class="text-sm font-medium text-gray-700">${cat}</span><span class="text-sm font-bold text-gray-900">${this.formatRp(nom)}</span></div>`;
+        });
+        document.getElementById('totalAllocationDisplay').innerText = this.formatRp(total); document.getElementById('budgetSetupList').innerHTML = html;
+      },
+      populateDropdowns() {
+        let accHtml = ''; this.data.accounts.forEach(a => accHtml += `<option value="${a.id}">${a.nama}</option>`);
+        document.getElementById('formSourceAcc').innerHTML = accHtml; document.getElementById('formDestAcc').innerHTML = accHtml; this.setTrxType('Pengeluaran'); 
+      },
+
+      setTrxType(type) {
+        this.activeTrxType = type;
+        const btnIn = document.getElementById('btnTypeIn'); const btnOut = document.getElementById('btnTypeOut'); const btnMut = document.getElementById('btnTypeMut'); const dCat = document.getElementById('formCategory');
+        [btnIn, btnOut, btnMut].forEach(b => { b.className = "flex-1 py-1 text-sm font-bold rounded-md text-gray-500"; });
+        document.getElementById('wrapDestAcc').classList.add('hidden'); document.getElementById('lblSourceAcc').innerText = "Rekening"; dCat.disabled = false;
+        let catList = [];
+        if (type === 'Pengeluaran') { btnOut.className = "flex-1 py-1 text-sm font-bold rounded-md bg-white shadow text-red-600"; catList = this.CAT_OUT; }
+        else if (type === 'Pemasukan') { btnIn.className = "flex-1 py-1 text-sm font-bold rounded-md bg-white shadow text-green-600"; catList = this.CAT_IN; }
+        else { btnMut.className = "flex-1 py-1 text-sm font-bold rounded-md bg-white shadow text-blue-600"; document.getElementById('wrapDestAcc').classList.remove('hidden'); document.getElementById('lblSourceAcc').innerText = "Rekening Asal"; dCat.disabled = true; catList = ['Mutasi']; }
+        dCat.innerHTML = catList.map(c => `<option value="${c}">${c}</option>`).join('');
+      },
+      saveTransaction() {
+        const nom = parseFloat(document.getElementById('formAmount').value); if (!nom || nom <= 0) return alert('Masukkan nominal valid!');
+        const date = document.getElementById('formDate').value; const sAcc = document.getElementById('formSourceAcc').value; const dAcc = document.getElementById('formDestAcc').value;
+        if (this.activeTrxType === 'Mutasi' && sAcc === dAcc) return alert('Rekening asal dan tujuan tidak boleh sama!');
+        const trx = { id: this.generateId(), waktu: new Date().toISOString(), tanggal: date, jenis: this.activeTrxType, nominal: nom, rekeningAsal: sAcc, rekeningTujuan: this.activeTrxType === 'Mutasi' ? dAcc : "", kategori: this.activeTrxType === 'Mutasi' ? "" : document.getElementById('formCategory').value, keterangan: document.getElementById('formNote').value };
+        
+        this.data.transactions.push(trx); 
+        this.data.syncQueue.addTrx.push(trx); // Masuk Antrean Tambah
+        this.saveState();
+        
+        document.getElementById('formAmount').value = ''; document.getElementById('formNote').value = ''; alert('Transaksi Berhasil Disimpan!'); this.nav('home');
+      },
+      updateInitialBalance() {
+        const id = document.getElementById('editAccSelect').value; const nom = parseFloat(document.getElementById('editAccBalance').value); if (isNaN(nom)) return alert('Nominal tidak valid!');
+        let acc = this.data.accounts.find(a => a.id === id);
+        if (acc) { 
+          acc.saldoAwal = nom; 
+          this.data.syncQueue.updAcc.push(acc); // Masuk Antrean Rekening
+          this.saveState(); 
+          this.renderAccounts(); 
+          document.getElementById('editAccBalance').value = ''; 
+          alert('Saldo Awal Berhasil Diupdate!'); 
+        }
+      },
+
+      openBudgetModal() {
+        const period = this.currentCyclePeriod; document.getElementById('modalMonthSpan').innerText = `(${this.formatPeriodDisplay(period)})`; let html = '';
+        this.CAT_OUT.forEach(cat => {
+          let budObj = this.data.budgets.find(b => b.bulan === period && b.kategori === cat); let nom = budObj ? budObj.nominal : '';
+          html += `<div><label class="block text-xs font-semibold text-gray-600 mb-1">${cat}</label><input type="number" id="modBud_${cat.replace(/[\s\/]/g,'')}" data-cat="${cat}" value="${nom}" placeholder="0" class="w-full p-2 border rounded-lg text-sm outline-none"></div>`;
+        });
+        document.getElementById('budgetModalForm').innerHTML = html; document.getElementById('budgetModal').classList.remove('hidden'); document.getElementById('budgetModal').classList.add('flex');
+      },
+      closeBudgetModal() { document.getElementById('budgetModal').classList.add('hidden'); document.getElementById('budgetModal').classList.remove('flex'); },
+      saveBudgets() {
+        const period = this.currentCyclePeriod; const inputs = document.querySelectorAll('#budgetModalForm input');
+        inputs.forEach(inp => {
+          let cat = inp.getAttribute('data-cat'); let nom = parseFloat(inp.value) || 0; let idx = this.data.budgets.findIndex(b => b.bulan === period && b.kategori === cat);
+          let budObj = { bulan: period, kategori: cat, nominal: nom };
+          if (idx > -1) { this.data.budgets[idx].nominal = nom; } else { if (nom > 0) this.data.budgets.push(budObj); }
+          this.data.syncQueue.updBud.push(budObj); // Masuk Antrean Anggaran
+        });
+        this.saveState(); this.closeBudgetModal(); this.renderBudget(); this.renderHome();
+      },
+
+      saveState() {
+        localStorage.setItem('financeData', JSON.stringify(this.data));
+        localStorage.setItem('financeConfig', JSON.stringify(this.config));
+        this.autoSync();
+      },
+      
+      // LOGIKA SINKRONISASI BARU 
+      updateConnectionStatus(isSyncing = false) {
+        const statusEl = document.getElementById('syncStatus'); 
+        this.config.gasUrl = document.getElementById('settingGasUrl').value.trim(); 
+        localStorage.setItem('financeConfig', JSON.stringify(this.config));
+        
+        if (!this.config.gasUrl) { 
+          statusEl.innerHTML = '<i class="fas fa-wifi-slash"></i> Offline'; 
+          statusEl.className = "flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-full shadow-sm bg-gray-200 text-gray-600"; 
+        }
+        else if (isSyncing) { 
+          statusEl.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> Sync...'; 
+          statusEl.className = "flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-full shadow-sm bg-blue-100 text-blue-600"; 
+        }
+        else { 
+          statusEl.innerHTML = '<i class="fas fa-sync-alt"></i> Sync'; 
+          statusEl.className = "flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-full shadow-sm bg-green-100 text-green-700 active:bg-green-200 transition-colors cursor-pointer"; 
+        }
+      },
+      autoSync() { if (this.config.gasUrl) this.forceSync(); },
+      async forceSync() {
+        if (!this.config.gasUrl) return alert('URL GAS kosong. Tetap dalam mode Offline.'); 
+        this.updateConnectionStatus(true); 
+        
+        // Kirim hanya antrean data yang baru dirubah di HP ini
+        const payload = { action: "sync", payload: this.data.syncQueue };
+        
+        try {
+          const btn = document.getElementById('btnSync'); if(btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Menyinkronkan...';
+          const res = await fetch(this.config.gasUrl, { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'text/plain;charset=utf-8' } });
+          const json = await res.json();
+          
+          if (json.status === 'success') {
+            // REPLACE TOTAL: Timpa data lokal dengan data Google Sheets (Master)
+            this.data.transactions = json.data.transactions;
+            this.data.accounts = json.data.accounts;
+            this.data.budgets = json.data.budgets;
+            
+            // Bersihkan antrean karena sudah sukses terkirim
+            this.data.syncQueue = { addTrx: [], delTrx: [], updAcc: [], updBud: [] }; 
+            
+            localStorage.setItem('financeData', JSON.stringify(this.data));
+            this.renderAll();
+          }
+        } catch (e) { 
+          console.error("Gagal Sync: ", e); 
+        } finally { 
+          this.updateConnectionStatus(); 
+          const btn = document.getElementById('btnSync'); if(btn) btn.innerHTML = '<i class="fas fa-sync-alt mr-2"></i>Sinkronisasi Sekarang'; 
+        }
+      }
+    };
+
+    window.onload = () => {
+      // Cek apakah baru saja login (kurang dari 24 jam)
+      if (!app.checkSession()) {
+        // Jika belum, biarkan di halaman PIN
+      }
+    };
+  </script>
+</body>
+</html>
